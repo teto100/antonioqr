@@ -99,6 +99,11 @@ export default function Home() {
               <span className="text-primary-500 mr-2">C)</span>
               El fin no es dar una respuesta amplia, sino validar conocimientos
             </li>
+            <li className="flex items-start">
+              <span className="text-primary-500 mr-2">D)</span>
+              Al final se habilitará un caso práctico puedes entrar las veces que necesites una vez terminado la prueba.
+            </li>
+            
           </ul>
         </div>
 
