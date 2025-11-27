@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Colección de postulantes - solo lectura desde servidor
+    match /postulante/{docId} {
+      allow read: if false; // Solo desde servidor
+      allow write: if false;
+    }
+    
+    // Colección de intentos - solo escritura desde servidor
+    match /attempts/{docId} {
+      allow read: if false;
+      allow write: if false; // Solo desde servidor
+    }
+    
+    // Colección de respuestas - solo escritura desde servidor
+    match /responses/{docId} {
+      allow read: if false;
+      allow write: if false; // Solo desde servidor
+    }
+    
+    // Colección de sesiones de test - solo desde servidor
+    match /test_sessions/{docId} {
+      allow read: if false;
+      allow write: if false; // Solo desde servidor
+    }
+    
+    // Bloquear acceso a cualquier otra colección
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
