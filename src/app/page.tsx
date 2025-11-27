@@ -89,7 +89,7 @@ export default function Home() {
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start">
               <span className="text-primary-500 mr-2">A)</span>
-              Tiene 10 minutos para completar las preguntas, si recargas o vuelves a entrar el tiempo seguirá corriendo.
+              Dispone de 12 minutos para completar las preguntas, si recargas o vuelves a entrar el tiempo seguirá corriendo.
             </li>
             <li className="flex items-start">
               <span className="text-primary-500 mr-2">B)</span>
