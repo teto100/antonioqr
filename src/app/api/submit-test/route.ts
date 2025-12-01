@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { analyzeAIPatterns } from '@/lib/ai-detector';
 
 export async function POST(request: NextRequest) {
   try {
-    const { dni, name, answers, timeExpired, completionTime, sessionId } = await request.json();
+    const { dni, name, answers, timeExpired, completionTime, sessionId, aiDetectionResults } = await request.json();
     
-    console.log('=== SUBMIT TEST API ===');
-    console.log('DNI:', dni);
-    console.log('Name:', name);
-    console.log('Answers:', answers);
-    console.log('Time expired:', timeExpired);
-    console.log('Session ID:', sessionId);
-    console.log('Answers count:', answers?.length);
-    console.log('Non-empty answers:', answers?.filter((a: string) => a && a.trim().length > 0).length);
-
     if (!dni || !name || !answers || !Array.isArray(answers)) {
-      console.log('ERROR: Datos incompletos');
+
       return NextResponse.json({ success: false, error: 'Datos incompletos' }, { status: 400 });
     }
 
@@ -25,14 +17,14 @@ export async function POST(request: NextRequest) {
     const totalQuestions = parseInt(process.env.TOTAL_QUESTIONS || '7');
     
     if (answers.length !== totalQuestions) {
-      console.log('ERROR: Número incorrecto de respuestas');
+
       return NextResponse.json({ success: false, error: 'Número incorrecto de respuestas' }, { status: 400 });
     }
     
     // Validar longitud de cada respuesta
     for (let i = 0; i < answers.length; i++) {
       if (typeof answers[i] !== 'string' || answers[i].length > maxLength) {
-        console.log(`ERROR: Respuesta ${i + 1} inválida`);
+
         return NextResponse.json({ success: false, error: `Respuesta ${i + 1} inválida` }, { status: 400 });
       }
     }
@@ -54,6 +46,37 @@ export async function POST(request: NextRequest) {
           throw new Error('Ya envió sus respuestas');
         }
         
+        // Analizar IA en el servidor como backup
+        const serverAiAnalysis = answers.map((answer: string) => {
+          if (answer && answer.length > 50) {
+            return analyzeAIPatterns(answer);
+          }
+          return null;
+        });
+        
+        // Calcular interpretación final
+        const highRiskCount = serverAiAnalysis.filter((result: any) => result?.probability > 0.6).length;
+        const moderateRiskCount = serverAiAnalysis.filter((result: any) => result?.probability > 0.4 && result?.probability <= 0.6).length;
+        const totalAnswers = answers.length;
+        
+        let finalInterpretation = "BAJO_RIESGO";
+        let riskLevel = "low";
+        let description = "Respuestas parecen auténticas";
+        
+        if (highRiskCount >= totalAnswers * 0.5) {
+          finalInterpretation = "CRITICO";
+          riskLevel = "critical";
+          description = `${highRiskCount}/${totalAnswers} respuestas con alta probabilidad de IA. Uso extensivo sospechoso.`;
+        } else if (highRiskCount >= totalAnswers * 0.2) {
+          finalInterpretation = "ALTO_RIESGO";
+          riskLevel = "high";
+          description = `${highRiskCount}/${totalAnswers} respuestas con alta probabilidad de IA. Uso significativo.`;
+        } else if (highRiskCount > 0 || moderateRiskCount >= totalAnswers * 0.3) {
+          finalInterpretation = "MODERADO";
+          riskLevel = "moderate";
+          description = `${highRiskCount} respuestas de alto riesgo, ${moderateRiskCount} de riesgo moderado. Posible uso ocasional.`;
+        }
+        
         // Crear o actualizar respuesta con DNI como ID del documento
         transaction.set(responseRef, {
           dni,
@@ -63,6 +86,26 @@ export async function POST(request: NextRequest) {
           timeExpired: timeExpired || false,
           completionTime: completionTime || 0,
           sessionId,
+          // Análisis de IA (oculto para el postulante)
+          aiAnalysis: {
+            clientResults: aiDetectionResults || [],
+            serverResults: serverAiAnalysis,
+            overallSuspicious: serverAiAnalysis.some((result: any) => result?.isLikelyAI),
+            highRiskAnswers: highRiskCount,
+            moderateRiskAnswers: moderateRiskCount,
+            totalAnswers,
+            analyzedAt: FieldValue.serverTimestamp(),
+            // Interpretación final
+            finalAssessment: {
+              interpretation: finalInterpretation,
+              riskLevel,
+              description,
+              recommendation: finalInterpretation === "CRITICO" ? "Rechazar - Uso extensivo de IA" :
+                            finalInterpretation === "ALTO_RIESGO" ? "Revisar manualmente - Uso significativo de IA" :
+                            finalInterpretation === "MODERADO" ? "Considerar entrevista adicional" :
+                            "Aprobar - Sin indicios significativos de IA"
+            }
+          },
           ...(existingDoc.exists ? { resubmitted: true, previousSubmissions: (existingDoc.data()?.previousSubmissions || 0) + 1 } : {})
         });
         

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTypingAnalysis } from '@/hooks/useTypingAnalysis';
 const questions = [
   "¿Qué servicio de AWS (ej. AWS Lambda, AWS Fargate, EC2) usaría para alojar el QR-Processor y por qué? Justifique su elección en términos de escalabilidad y costo por transacción.",
   "¿Qué base de datos de AWS (ej. DynamoDB, Aurora RDS) elegiría para manejar el estado transaccional (ID del QR, expiración, estado del pago) y por qué? Justifique su elección en función de la alta concurrencia esperada en un sistema de pagos.",
@@ -23,8 +24,10 @@ export default function TestPage() {
   const [showPasteAlert, setShowPasteAlert] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
   const [showTimeExpired, setShowTimeExpired] = useState(false);
+  const [aiDetectionResults, setAiDetectionResults] = useState<any[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { recordKeyEvent, analyzeTyping, reset } = useTypingAnalysis();
 
   const token = searchParams.get('token');
   const [dni, setDniState] = useState<string | null>(null);
@@ -116,9 +119,7 @@ export default function TestPage() {
                 setTimeLeft(checkResult.timeRemaining);
                 
                 if (checkResult.timeRemaining === 0 || checkResult.completed) {
-                  console.log('TIME IS UP! Remaining:', checkResult.timeRemaining, 'Completed:', checkResult.completed);
                   clearInterval(timer);
-                  console.log('Calling handleSubmit with timeExpired=true');
                   handleSubmit(true);
                 }
               }
@@ -202,7 +203,7 @@ export default function TestPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleAnswerChange = (index: number, value: string) => {
+  const handleAnswerChange = async (index: number, value: string) => {
     if (value.length > 200) return;
     const newAnswers = [...answers];
     newAnswers[index] = value;
@@ -211,6 +212,33 @@ export default function TestPage() {
     // Guardar en localStorage
     if (dni) {
       localStorage.setItem(`test_answers_${dni}`, JSON.stringify(newAnswers));
+    }
+    
+    // Detectar IA si la respuesta tiene más de 50 caracteres
+    if (value.length > 50) {
+      try {
+        const response = await fetch('/api/detect-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: value })
+        });
+        
+        const result = await response.json();
+        
+        const newResults = [...aiDetectionResults];
+        newResults[index] = {
+          ...result,
+          typingAnalysis: analyzeTyping(value)
+        };
+        setAiDetectionResults(newResults);
+        
+        // Log para debugging
+        if (result.aiProbability > 0.5) {
+
+        }
+      } catch (error) {
+        console.error('Error detectando IA:', error);
+      }
     }
   };
 
@@ -221,16 +249,10 @@ export default function TestPage() {
   };
 
   const handleSubmit = async (timeExpired = false) => {
-    console.log('=== HANDLE SUBMIT START ===');
-    console.log('timeExpired:', timeExpired);
-    console.log('Current answers state:', answers);
-    console.log('Answers array length:', answers.length);
-    console.log('Questions array length:', questions.length);
-    console.log('Non-empty answers count:', answers.filter(a => a && a.trim().length > 0).length);
-    console.log('localStorage content:', localStorage.getItem(`test_answers_${dni}`));
+
     
     if (timeExpired) {
-      console.log('=== TIME EXPIRED FLOW ===');
+
       
       // Verificar si hay respuestas en localStorage
       const savedAnswers = localStorage.getItem(`test_answers_${dni}`);
@@ -239,16 +261,14 @@ export default function TestPage() {
       if (savedAnswers) {
         try {
           const parsedSaved = JSON.parse(savedAnswers);
-          console.log('Found saved answers in localStorage:', parsedSaved);
+
           finalAnswers = parsedSaved;
         } catch (error) {
           console.error('Error parsing saved answers:', error);
         }
       }
       
-      console.log('Final answers to submit:', finalAnswers);
-      console.log('Final answers length:', finalAnswers.length);
-      console.log('Final non-empty count:', finalAnswers.filter(a => a && a.trim().length > 0).length);
+
       
       // Enviar respuestas ANTES de mostrar el popup
       const submitData = {
@@ -257,10 +277,11 @@ export default function TestPage() {
         answers: finalAnswers,
         timeExpired: true,
         completionTime: testDurationSeconds - timeLeft,
-        sessionId
+        sessionId,
+        aiDetectionResults
       };
       
-      console.log('Submitting data:', submitData);
+
       
       try {
         const response = await fetch('/api/submit-test', {
@@ -270,7 +291,7 @@ export default function TestPage() {
         });
         
         const result = await response.json();
-        console.log('Submit response:', result);
+
         
         if (result.success) {
           // Limpiar localStorage solo si se guardó exitosamente
@@ -317,7 +338,8 @@ export default function TestPage() {
           answers,
           timeExpired,
           completionTime: testDurationSeconds - timeLeft,
-          sessionId
+          sessionId,
+          aiDetectionResults
         })
       });
 
@@ -338,11 +360,7 @@ export default function TestPage() {
     }
   };
 
-  console.log('RENDER CHECK - DNI:', dni, 'Name:', name);
-  if (typeof window !== 'undefined') {
-    console.log('Current URL:', window.location.href);
-    console.log('Current pathname:', window.location.pathname);
-  }
+
   
   if (!tokenValidated || !dni || !name) {
     return (
@@ -352,7 +370,7 @@ export default function TestPage() {
     );
   }
   
-  console.log('Rendering test page with DNI:', dni, 'Name:', name);
+
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -383,6 +401,8 @@ export default function TestPage() {
                 value={answers[index]}
                 onChange={(e) => handleAnswerChange(index, e.target.value)}
                 onPaste={handlePaste}
+                onKeyDown={(e) => recordKeyEvent(e.key, 'keydown')}
+                onKeyUp={(e) => recordKeyEvent(e.key, 'keyup')}
                 className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent no-paste"
                 placeholder="Escriba su respuesta aquí... (máx. 200 caracteres)"
                 disabled={submitting}

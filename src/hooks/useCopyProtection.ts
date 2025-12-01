@@ -9,7 +9,7 @@ export const useCopyProtection = () => {
     // Prevenir clic derecho y copia
     const preventRightClick = (e: MouseEvent) => e.preventDefault();
     const preventCopy = (e: ClipboardEvent) => {
-      console.log('🚫 COPY INTERCEPTED - Replacing with security message');
+
       e.clipboardData?.setData('text/plain', 'Te estoy viendo 👀');
       e.preventDefault();
     };
@@ -19,31 +19,31 @@ export const useCopyProtection = () => {
       try {
         if (navigator.clipboard && navigator.clipboard.readText) {
           const clipboardText = await navigator.clipboard.readText();
-          console.log('🔍 CLIPBOARD CHECK - Current content:', clipboardText ? `"${clipboardText.substring(0, 50)}..."` : 'empty');
+
           if (clipboardText && clipboardText !== 'Te estoy viendo 👀') {
-            console.log('⚠️ CLIPBOARD REPLACED - Unauthorized content detected');
+
             await navigator.clipboard.writeText('Te estoy viendo 👀');
           }
         }
       } catch (error) {
-        console.log('❌ CLIPBOARD ERROR:', (error as Error).message);
+
       }
     }, 1000);
 
     const preventKeys = (e: KeyboardEvent) => {
       // Windows/Linux (Ctrl) y Mac (Cmd)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'a' || e.key === 'x' || e.key === 's' || e.key === 'u')) {
-        console.log(`🚫 KEY BLOCKED - ${e.metaKey ? 'Cmd' : 'Ctrl'}+${e.key.toUpperCase()}`);
+
         e.preventDefault();
       }
       // DevTools
       if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I')) {
-        console.log(`🚫 DEVTOOLS BLOCKED - ${e.key === 'F12' ? 'F12' : (e.metaKey ? 'Cmd' : 'Ctrl') + '+Shift+I'}`);
+
         e.preventDefault();
       }
       // Mac: Cmd+Option+I para DevTools
       if (e.metaKey && e.altKey && e.key === 'i') {
-        console.log('🚫 DEVTOOLS BLOCKED - Cmd+Option+I');
+
         e.preventDefault();
       }
     };

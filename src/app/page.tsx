@@ -89,7 +89,7 @@ export default function Home() {
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start">
               <span className="text-primary-500 mr-2">A)</span>
-              Dispone de 12 minutos para completar las preguntas, si recargas o vuelves a entrar el tiempo seguirá corriendo.
+              Dispone de 20 minutos para completar las preguntas, si recargas o vuelves a entrar el tiempo seguirá corriendo.
             </li>
             <li className="flex items-start">
               <span className="text-primary-500 mr-2">B)</span>
@@ -155,7 +155,7 @@ export default function Home() {
               <div className="text-4xl mb-4">⏰</div>
               <h3 className="text-xl font-bold mb-2 text-gray-900">¿Está seguro de iniciar?</h3>
               <p className="text-gray-600">
-                Una vez que confirme, el tiempo comenzará a correr y tendrá <strong>10 minutos</strong> para completar el test.
+                Una vez que confirme, el tiempo comenzará a correr y tendrá <strong>20 minutos</strong> para completar el test.
               </p>
             </div>
             <div className="flex space-x-4">
