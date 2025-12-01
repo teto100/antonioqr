@@ -48,10 +48,16 @@ export async function POST(request: NextRequest) {
         
         // Analizar IA en el servidor como backup
         const serverAiAnalysis = answers.map((answer: string) => {
-          if (answer && answer.length > 50) {
+          if (answer && answer.trim().length > 10) {
             return analyzeAIPatterns(answer);
           }
-          return null;
+          // Respuesta muy corta o vacía
+          return {
+            score: 0,
+            probability: 0,
+            findings: answer.trim().length === 0 ? ['Respuesta vacía'] : ['Respuesta muy corta'],
+            isLikelyAI: false
+          };
         });
         
         // Calcular interpretación final

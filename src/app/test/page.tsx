@@ -214,8 +214,8 @@ export default function TestPage() {
       localStorage.setItem(`test_answers_${dni}`, JSON.stringify(newAnswers));
     }
     
-    // Detectar IA si la respuesta tiene más de 50 caracteres
-    if (value.length > 50) {
+    // Análisis de IA silencioso (sin mostrar al postulante)
+    if (value.trim().length > 10) {
       try {
         const response = await fetch('/api/detect-ai', {
           method: 'POST',
@@ -231,14 +231,50 @@ export default function TestPage() {
           typingAnalysis: analyzeTyping(value)
         };
         setAiDetectionResults(newResults);
-        
-        // Log para debugging
-        if (result.aiProbability > 0.5) {
-
-        }
       } catch (error) {
-        console.error('Error detectando IA:', error);
+        // Error silencioso
       }
+    } else {
+      const newResults = [...aiDetectionResults];
+      newResults[index] = {
+        aiProbability: 0,
+        confidence: 'low',
+        details: { finalScore: 0 },
+        typingAnalysis: analyzeTyping(value)
+      };
+      setAiDetectionResults(newResults);
+    }
+    
+    // Detectar IA si la respuesta tiene contenido
+    if (value.trim().length > 10) {
+      try {
+        const response = await fetch('/api/detect-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: value })
+        });
+        
+        const result = await response.json();
+        
+        const newResults = [...aiDetectionResults];
+        newResults[index] = {
+          ...result,
+          typingAnalysis: analyzeTyping(value)
+        };
+        setAiDetectionResults(newResults);
+      } catch (error) {
+        // Error detectando IA
+      }
+    } else {
+      // Respuesta muy corta o vacía
+      const newResults = [...aiDetectionResults];
+      newResults[index] = {
+        aiProbability: 0,
+        confidence: 'low',
+        details: { finalScore: 0 },
+        typingAnalysis: analyzeTyping(value)
+      };
+      setAiDetectionResults(newResults);
     }
   };
 
@@ -401,6 +437,8 @@ export default function TestPage() {
                 value={answers[index]}
                 onChange={(e) => handleAnswerChange(index, e.target.value)}
                 onPaste={handlePaste}
+                onKeyDown={(e) => recordKeyEvent(e.key, 'keydown')}
+                onKeyUp={(e) => recordKeyEvent(e.key, 'keyup')}
                 onKeyDown={(e) => recordKeyEvent(e.key, 'keydown')}
                 onKeyUp={(e) => recordKeyEvent(e.key, 'keyup')}
                 className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent no-paste"

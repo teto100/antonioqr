@@ -13,6 +13,12 @@ interface TypingAnalysis {
   backspaces: number;
   totalTime: number;
   suspicious: boolean;
+  cpm?: number;
+  veryLongPauses?: number;
+  shortPauses?: number;
+  suspiciousReasons?: string[];
+  charCount?: number;
+  pauseCount?: number;
 }
 
 export const useTypingAnalysis = () => {
@@ -43,7 +49,7 @@ export const useTypingAnalysis = () => {
 
     const totalTime = (Date.now() - startTime) / 1000 / 60; // minutos
     const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
-    const wpm = wordCount / totalTime;
+    const wpm = totalTime > 0 ? wordCount / totalTime : 0;
 
     // Analizar pausas entre teclas
     const keyDownEvents = events.filter(e => e.type === 'keydown');
@@ -54,24 +60,50 @@ export const useTypingAnalysis = () => {
       pauses.push(pause);
     }
 
-    const avgPauseTime = pauses.reduce((a, b) => a + b, 0) / pauses.length;
+    const avgPauseTime = pauses.length > 0 ? pauses.reduce((a, b) => a + b, 0) / pauses.length : 0;
     const longPauses = pauses.filter(p => p > 3000).length; // Pausas >3 segundos
+    const veryLongPauses = pauses.filter(p => p > 10000).length; // Pausas >10 segundos
     const backspaces = events.filter(e => e.key === 'Backspace').length;
-
+    const shortPauses = pauses.filter(p => p < 100).length; // Pausas muy cortas
+    
+    // Calcular velocidad por carácter
+    const charCount = text.length;
+    const cpm = totalTime > 0 ? charCount / totalTime : 0; // caracteres por minuto
+    
     // Detectar patrones sospechosos
-    const suspicious = 
-      wpm > 120 || // Muy rápido
-      longPauses > 3 || // Muchas pausas largas (pensando/copiando)
-      (wpm > 80 && backspaces < 5) || // Rápido sin errores
-      avgPauseTime > 2000; // Pausas muy largas en promedio
+    let suspiciousReasons: string[] = [];
+    
+    if (wpm > 150) suspiciousReasons.push('Velocidad extremadamente alta');
+    else if (wpm > 100) suspiciousReasons.push('Velocidad muy alta');
+    
+    if (cpm > 600) suspiciousReasons.push('Caracteres por minuto muy alto');
+    
+    if (wpm > 80 && backspaces < 3) suspiciousReasons.push('Alta velocidad sin errores');
+    
+    if (veryLongPauses > 2) suspiciousReasons.push('Múltiples pausas muy largas (posible copia)');
+    
+    if (shortPauses > charCount * 0.8) suspiciousReasons.push('Escritura demasiado uniforme');
+    
+    if (avgPauseTime > 3000) suspiciousReasons.push('Pausas promedio muy largas');
+    
+    if (totalTime < 0.5 && charCount > 50) suspiciousReasons.push('Respuesta larga en tiempo muy corto');
+    
+    const suspicious = suspiciousReasons.length > 0;
 
     return {
-      wpm,
-      avgPauseTime,
+      wpm: Math.round(wpm * 100) / 100,
+      avgPauseTime: Math.round(avgPauseTime),
       longPauses,
       backspaces,
-      totalTime: totalTime * 60,
-      suspicious
+      totalTime: Math.round(totalTime * 60 * 100) / 100,
+      suspicious,
+      // Datos adicionales para análisis
+      cpm: Math.round(cpm),
+      veryLongPauses,
+      shortPauses,
+      suspiciousReasons,
+      charCount,
+      pauseCount: pauses.length
     };
   }, [events, startTime]);
 
